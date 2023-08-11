@@ -28,11 +28,7 @@ const betDb = new Keyv(process.env.DB_URL, {
 betDb.on("error", (err) => console.log("DB error:", err));
 
 const client = new Client({
-	intents: [
-		GatewayIntentBits.Guilds,
-		GatewayIntentBits.GuildMembers,
-		GatewayIntentBits.MessageContent,
-	],
+	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 
 interface BetInfo {
