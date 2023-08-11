@@ -210,7 +210,7 @@ const endBet = async (betInfo: BetInfo) => {
 	if (betInfo.winningTeam) return;
 	console.log(`Ending ${betInfo.betId}`);
 	const winningTeam =
-		Math.random() < 0.01 ? TEAM_NAME.TEAM_1 : TEAM_NAME.TEAM_2;
+		Math.random() < 0.5 ? TEAM_NAME.TEAM_1 : TEAM_NAME.TEAM_2;
 	betInfo.winningTeam = winningTeam;
 	const losingTeam =
 		winningTeam === TEAM_NAME.TEAM_1 ? TEAM_NAME.TEAM_2 : TEAM_NAME.TEAM_1;
