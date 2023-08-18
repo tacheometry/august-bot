@@ -6,14 +6,60 @@ const COMMAND_DEFINITIONS = [
 	new SlashCommandBuilder()
 		.setName("pariu")
 		.setDescription("Începe un pariu.")
-		.addChannelOption((o) => o.setName("canal").setRequired(true).setDescription("Canalul pariului").addChannelTypes(ChannelType.GuildText))
+		.addChannelOption((o) =>
+			o
+				.setName("canal")
+				.setRequired(true)
+				.setDescription("Canalul pariului")
+				.addChannelTypes(ChannelType.GuildText),
+		)
 		.setDefaultMemberPermissions(0)
+		.setDMPermission(false),
+	new SlashCommandBuilder()
+		.setName("info")
+		.setDescription("Informații despre un subiect, după comunitate.")
 		.setDMPermission(false)
+		.addSubcommand((c) =>
+			c
+				.setName("despre")
+				.setDescription(
+					"Informații despre un subiect, după comunitate.",
+				)
+				.addStringOption((o) =>
+					o
+						.setName("subiect")
+						.setRequired(false)
+						.setDescription("Subiectul despre care iei informația.")
+						.setAutocomplete(true)
+						.setMaxLength(100),
+				),
+		)
+		.addSubcommand((c) =>
+			c
+				.setName("edit")
+				.setDescription("Adaugă/editează informații.")
+				.addStringOption((o) =>
+					o
+						.setName("subiect")
+						.setRequired(true)
+						.setDescription(
+							"Subiectul despre care vrei să adaugi o informație.",
+						)
+						.setMaxLength(100),
+				)
+				.addStringOption((o) =>
+					o
+						.setName("info")
+						.setRequired(true)
+						.setDescription(
+							"Informația despre subiect. Scrie REMOVE pentru a șterge.",
+						)
+						.setMaxLength(1900),
+				),
+		),
 ];
 
-const rest = new REST().setToken(
-	process.env.DISCORD_TOKEN as string
-);
+const rest = new REST().setToken(process.env.DISCORD_TOKEN as string);
 
 const jsonCommands = COMMAND_DEFINITIONS.map((v) => v.toJSON());
 

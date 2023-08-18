@@ -4,7 +4,6 @@ import {
 	GatewayIntentBits,
 	Events,
 	ActivityType,
-	ChatInputCommandInteraction,
 	TextChannel,
 	ModalBuilder,
 	TextInputBuilder,
@@ -17,6 +16,7 @@ import {
 	ButtonStyle,
 	MessageCreateOptions,
 	MessageEditOptions,
+	InteractionReplyOptions,
 } from "discord.js";
 import { DateTime } from "luxon";
 import Keyv from "keyv";
@@ -27,9 +27,22 @@ const betDb = new Keyv(process.env.DB_URL, {
 });
 betDb.on("error", (err) => console.log("DB error:", err));
 
+const factDb = new Keyv(process.env.DB_URL, {
+	namespace: "facts",
+});
+factDb.on("error", (err) => console.log("DB error:", err));
+const factSubjectCache = new Map<string, string[]>();
+
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
+
+interface FactInfo {
+	authorId: string;
+	subject: string;
+	body: string;
+	editedAt: string;
+}
 
 interface BetInfo {
 	betId: string;
@@ -62,6 +75,17 @@ const TEAM_DISPLAY_NAME: Record<TEAM_NAME, string> = {
 };
 
 const timeoutsForBets = new Map<string, NodeJS.Timeout>();
+
+const generateFactMessage = (info: FactInfo): InteractionReplyOptions => {
+	return {
+		content: `**${info.subject.toUpperCase()}** *(adăugat de <@${
+			info.authorId
+		}>)*\n\n${info.body}`,
+		allowedMentions: {
+			parse: [],
+		},
+	};
+};
 
 const generateBetMessage = (
 	info: Omit<BetInfo, "messageId" | "channelId">,
@@ -315,183 +339,309 @@ client.once(Events.ClientReady, async (c) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-	if (interaction.isCommand()) {
-		interaction = interaction as ChatInputCommandInteraction;
+	if (!interaction.isChatInputCommand()) return;
 
-		switch (interaction.commandName) {
-			case "pariu": {
-				const postChannel = interaction.options.getChannel(
-					"canal",
-					true,
-				) as TextChannel;
+	switch (interaction.commandName) {
+		case "pariu": {
+			const postChannel = interaction.options.getChannel(
+				"canal",
+				true,
+			) as TextChannel;
 
-				const betId = `pariu-${interaction.id}`;
+			const betId = `pariu-${interaction.id}`;
 
-				{
-					const modal = new ModalBuilder()
-						.setCustomId(betId)
-						.setTitle("Creare pariu");
+			{
+				const modal = new ModalBuilder()
+					.setCustomId(betId)
+					.setTitle("Creare pariu");
 
-					const titleInput = new TextInputBuilder()
-						.setCustomId("title")
-						.setLabel("Titlu")
-						.setStyle(TextInputStyle.Short)
-						.setValue("Pariu");
+				const titleInput = new TextInputBuilder()
+					.setCustomId("title")
+					.setLabel("Titlu")
+					.setStyle(TextInputStyle.Short)
+					.setValue("Pariu");
 
-					const descriptionInput = new TextInputBuilder()
-						.setCustomId("description")
-						.setLabel("Descriere")
-						.setStyle(TextInputStyle.Paragraph);
+				const descriptionInput = new TextInputBuilder()
+					.setCustomId("description")
+					.setLabel("Descriere")
+					.setStyle(TextInputStyle.Paragraph);
 
-					const rewardDescriptionInput = new TextInputBuilder()
-						.setCustomId("reward")
-						.setLabel("Descriere recompensă")
-						.setStyle(TextInputStyle.Paragraph);
+				const rewardDescriptionInput = new TextInputBuilder()
+					.setCustomId("reward")
+					.setLabel("Descriere recompensă")
+					.setStyle(TextInputStyle.Paragraph);
 
-					const resultAnnouncementTimeInput = new TextInputBuilder()
-						.setCustomId("resultTime")
-						.setLabel("Timpul anunțării rezultatelor")
-						.setStyle(TextInputStyle.Short);
+				const resultAnnouncementTimeInput = new TextInputBuilder()
+					.setCustomId("resultTime")
+					.setLabel("Timpul anunțării rezultatelor")
+					.setStyle(TextInputStyle.Short);
 
-					const muteDurationInput = new TextInputBuilder()
-						.setCustomId("muteDuration")
-						.setLabel("Durata de timeout (ore)")
-						.setStyle(TextInputStyle.Short)
-						.setValue("12");
+				const muteDurationInput = new TextInputBuilder()
+					.setCustomId("muteDuration")
+					.setLabel("Durata de timeout (ore)")
+					.setStyle(TextInputStyle.Short)
+					.setValue("12");
 
-					modal.addComponents(
-						...[
-							titleInput,
-							descriptionInput,
-							rewardDescriptionInput,
-							resultAnnouncementTimeInput,
-							muteDurationInput,
-						].map(
-							(textBuilder) =>
-								new ActionRowBuilder().addComponents(
-									textBuilder,
-								) as
-									| ActionRowBuilder<TextInputBuilder>
-									| APIActionRowComponent<APITextInputComponent>,
-						),
-					);
-
-					await interaction.showModal(modal);
-				}
-				interaction = await interaction.awaitModalSubmit({
-					filter: (i) => i.customId === betId,
-					time: 5 * 60 * 1000,
-				});
-
-				if (!interaction.isModalSubmit()) return;
-				const titleText = interaction.fields.getTextInputValue("title");
-				const descriptionText =
-					interaction.fields.getTextInputValue("description");
-				const rewardText =
-					interaction.fields.getTextInputValue("reward");
-				const resultAnnouncementTimeText =
-					interaction.fields.getTextInputValue("resultTime");
-				const muteDurationText =
-					interaction.fields.getTextInputValue("muteDuration");
-
-				await interaction.deferReply({
-					ephemeral: true,
-				});
-
-				const muteDurationHours =
-					Math.floor(parseFloat(muteDurationText) * 10) / 10;
-
-				const resultAnnouncementTime = DateTime.fromISO(
-					resultAnnouncementTimeText,
-					{
-						locale: "ro-RO",
-						zone: "Europe/Bucharest",
-					},
+				modal.addComponents(
+					...[
+						titleInput,
+						descriptionInput,
+						rewardDescriptionInput,
+						resultAnnouncementTimeInput,
+						muteDurationInput,
+					].map(
+						(textBuilder) =>
+							new ActionRowBuilder().addComponents(
+								textBuilder,
+							) as
+								| ActionRowBuilder<TextInputBuilder>
+								| APIActionRowComponent<APITextInputComponent>,
+					),
 				);
 
-				if (resultAnnouncementTime.invalidReason) {
-					interaction.editReply({
-						content: `Timpul anunțării rezultatelor este greșit (\`${resultAnnouncementTime.invalidExplanation}\`).`,
-					});
-					return;
-				}
-
-				if (
-					resultAnnouncementTime.diffNow().as("days") > 10 ||
-					resultAnnouncementTime < DateTime.now()
-				) {
-					interaction.editReply({
-						content: `Timpul anunțării rezultatelor este greșit, probabil (<t:${resultAnnouncementTime.toSeconds()}:F>).`,
-					});
-					return;
-				}
-
-				const betInfo = await startBet(postChannel, {
-					betId,
-					titleText,
-					descriptionText,
-					rewardText,
-					muteHours: muteDurationHours,
-					resultTime: resultAnnouncementTime.toISO()!,
-					hostName: interaction.user.displayName,
-					hostPicture:
-						interaction.user.avatarURL({
-							forceStatic: true,
-							size: 128,
-						}) ?? interaction.user.defaultAvatarURL,
-					participants: {},
-				});
-
-				await interaction.editReply({
-					content: `Pariu creat: https://discord.com/channels/${interaction.guildId}/${betInfo.channelId}/${betInfo.messageId}`,
-				});
-
-				break;
+				await interaction.showModal(modal);
 			}
-		}
-	}
-	if (interaction.isButton()) {
-		const [idFirst, idMiddle, idLast] = interaction.customId.split("|");
+			interaction = await interaction.awaitModalSubmit({
+				filter: (i) => i.customId === betId,
+				time: 5 * 60 * 1000,
+			});
 
-		if (idFirst === "enter-team") {
-			const teamName = idMiddle;
-			const betId = idLast;
+			if (!interaction.isModalSubmit()) return;
+			const titleText = interaction.fields.getTextInputValue("title");
+			const descriptionText =
+				interaction.fields.getTextInputValue("description");
+			const rewardText = interaction.fields.getTextInputValue("reward");
+			const resultAnnouncementTimeText =
+				interaction.fields.getTextInputValue("resultTime");
+			const muteDurationText =
+				interaction.fields.getTextInputValue("muteDuration");
 
-			const betInfo = (await betDb.get(betId)) as BetInfo | undefined;
+			await interaction.deferReply({
+				ephemeral: true,
+			});
 
-			if (
-				!betInfo ||
-				DateTime.fromISO(betInfo.resultTime)! < DateTime.now() ||
-				betInfo.winningTeam
-			) {
-				interaction.reply({
-					ephemeral: true,
-					content: "Acest pariu nu mai este valabil.",
+			const muteDurationHours =
+				Math.floor(parseFloat(muteDurationText) * 10) / 10;
+
+			const resultAnnouncementTime = DateTime.fromISO(
+				resultAnnouncementTimeText,
+				{
+					locale: "ro-RO",
+					zone: "Europe/Bucharest",
+				},
+			);
+
+			if (resultAnnouncementTime.invalidReason) {
+				interaction.editReply({
+					content: `Timpul anunțării rezultatelor este greșit (\`${resultAnnouncementTime.invalidExplanation}\`).`,
 				});
 				return;
 			}
 
-			const userId = interaction.user.id;
-			let replyMessage;
-			if (betInfo.participants[userId] === teamName) {
-				delete betInfo.participants[userId];
-				replyMessage = "Ai ieșit din pariu.";
-			} else {
-				betInfo.participants[userId] = teamName;
-				// @ts-ignore
-				replyMessage = `Te-ai înscris în pariu cu echipa ${TEAM_DISPLAY_NAME[teamName]}. Noroc!`;
+			if (
+				resultAnnouncementTime.diffNow().as("days") > 10 ||
+				resultAnnouncementTime < DateTime.now()
+			) {
+				interaction.editReply({
+					content: `Timpul anunțării rezultatelor este greșit, probabil (<t:${resultAnnouncementTime.toSeconds()}:F>).`,
+				});
+				return;
 			}
 
-			await betDb.set(betId, betInfo);
-
-			interaction.reply({
-				ephemeral: true,
-				content: replyMessage,
+			const betInfo = await startBet(postChannel, {
+				betId,
+				titleText,
+				descriptionText,
+				rewardText,
+				muteHours: muteDurationHours,
+				resultTime: resultAnnouncementTime.toISO()!,
+				hostName: interaction.user.displayName,
+				hostPicture:
+					interaction.user.avatarURL({
+						forceStatic: true,
+						size: 128,
+					}) ?? interaction.user.defaultAvatarURL,
+				participants: {},
 			});
 
-			updateBetMessage(betInfo, true);
+			await interaction.editReply({
+				content: `Pariu creat: https://discord.com/channels/${interaction.guildId}/${betInfo.channelId}/${betInfo.messageId}`,
+			});
+
+			break;
+		}
+		case "info": {
+			const guildFactInfo =
+				(await factDb.get(interaction.guildId!)) ?? {};
+			const factKeys = Object.keys(guildFactInfo);
+
+			switch (interaction.options.getSubcommand()) {
+				case "despre": {
+					let subject = interaction.options.getString(
+						"subiect",
+						false,
+					);
+					// Pick at random
+					if (!subject)
+						subject =
+							factKeys[
+								Math.floor(Math.random() * factKeys.length)
+							];
+					const factInfo = guildFactInfo[subject] as
+						| FactInfo
+						| undefined;
+					if (!factInfo) {
+						interaction.reply({
+							ephemeral: true,
+							content: `Nu există informații pentru acest subiect. Poți să adaugi folosind comanda </info edit:${process.env.INFO_COMMAND_ID}>.`,
+						});
+						return;
+					}
+
+					await interaction.reply(generateFactMessage(factInfo));
+
+					break;
+				}
+				case "edit": {
+					const subject = interaction.options
+						.getString("subiect", true)
+						.toLowerCase();
+					const body = interaction.options.getString("info", true);
+					let factInfo = guildFactInfo[subject] as
+						| FactInfo
+						| undefined;
+
+					if (
+						factInfo &&
+						interaction.user.id !== factInfo.authorId &&
+						!interaction.memberPermissions!.has(
+							"ManageMessages",
+							true,
+						)
+					) {
+						interaction.reply({
+							ephemeral: true,
+							content: "Nu poți edita această informație.",
+						});
+						return;
+					}
+
+					if (body === "REMOVE") {
+						if (!factInfo) {
+							await interaction.reply({
+								ephemeral: true,
+								content: "Nu poți șterge această informație.",
+							});
+							return;
+						}
+
+						delete guildFactInfo[subject];
+						await factDb.set(interaction.guildId!, guildFactInfo);
+						console.log(
+							`Fact "${subject}" deleted by ${interaction.user.id}`,
+						);
+						await interaction.reply({
+							ephemeral: true,
+							content: `Informația adăugată de <@${factInfo.authorId}> a fost ștearsă.`,
+							allowedMentions: {
+								parse: [],
+							},
+						});
+						factSubjectCache.set(
+							interaction.guildId!,
+							Object.keys(guildFactInfo),
+						);
+						return;
+					}
+
+					factInfo = {
+						authorId: interaction.user.id,
+						editedAt: DateTime.now().toISO()!,
+						subject,
+						body,
+					};
+					guildFactInfo[subject] = factInfo;
+					await factDb.set(interaction.guildId!, guildFactInfo);
+					console.log(
+						`Fact "${subject}" edited by ${interaction.user.id}: "${body}"`,
+					);
+					factSubjectCache.set(
+						interaction.guildId!,
+						Object.keys(guildFactInfo),
+					);
+					await interaction.reply(generateFactMessage(factInfo));
+
+					break;
+				}
+			}
+
+			break;
 		}
 	}
+});
+
+client.on(Events.InteractionCreate, async (interaction) => {
+	if (!interaction.isButton()) return;
+	const [idFirst, idMiddle, idLast] = interaction.customId.split("|");
+
+	if (idFirst === "enter-team") {
+		const teamName = idMiddle;
+		const betId = idLast;
+
+		const betInfo = (await betDb.get(betId)) as BetInfo | undefined;
+
+		if (
+			!betInfo ||
+			DateTime.fromISO(betInfo.resultTime)! < DateTime.now() ||
+			betInfo.winningTeam
+		) {
+			interaction.reply({
+				ephemeral: true,
+				content: "Acest pariu nu mai este valabil.",
+			});
+			return;
+		}
+
+		const userId = interaction.user.id;
+		let replyMessage;
+		if (betInfo.participants[userId] === teamName) {
+			delete betInfo.participants[userId];
+			replyMessage = "Ai ieșit din pariu.";
+		} else {
+			betInfo.participants[userId] = teamName;
+			// @ts-ignore
+			replyMessage = `Te-ai înscris în pariu cu echipa ${TEAM_DISPLAY_NAME[teamName]}. Noroc!`;
+		}
+
+		await betDb.set(betId, betInfo);
+
+		interaction.reply({
+			ephemeral: true,
+			content: replyMessage,
+		});
+
+		updateBetMessage(betInfo, true);
+	}
+});
+
+client.on(Events.InteractionCreate, async (interaction) => {
+	if (!interaction.isAutocomplete()) return;
+	const guildId = interaction.guildId!;
+
+	let factKeys = factSubjectCache.get(guildId);
+	if (!factKeys) {
+		const guildFactData = (await factDb.get(guildId)) ?? {};
+		factKeys = Object.keys(guildFactData);
+		factSubjectCache.set(guildId, factKeys);
+	}
+
+	const response = factKeys
+		.filter((k) =>
+			k.startsWith(interaction.options.getFocused().toLowerCase()),
+		)
+		.map((k) => ({ name: k, value: k }));
+
+	interaction.respond(response);
 });
 
 client.login(process.env.DISCORD_TOKEN);
