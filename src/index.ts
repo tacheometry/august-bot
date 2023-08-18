@@ -20,7 +20,7 @@ client.once(Events.ClientReady, async (c) => {
 		type: ActivityType.Playing,
 	});
 
-	refreshAllBetTimeouts(client);
+	await refreshAllBetTimeouts(client);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

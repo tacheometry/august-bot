@@ -18,6 +18,8 @@ import {
 } from "discord.js";
 import { DateTime } from "luxon";
 import Keyv from "keyv";
+import * as dotenv from "dotenv";
+dotenv.config();
 
 export interface BetInfo {
 	betId: string;
