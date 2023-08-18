@@ -56,7 +56,8 @@ export const respondToSubjectAutocomplete = async (
 		.filter((k) =>
 			k.startsWith(interaction.options.getFocused().toLowerCase()),
 		)
-		.map((k) => ({ name: k, value: k }));
+		.map((k) => ({ name: k, value: k }))
+		.slice(0, 25);
 
 	interaction.respond(response);
 };
