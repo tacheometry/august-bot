@@ -133,7 +133,8 @@ const generateBetMessage = (
 									? participantIds
 											.slice(0, 44)
 											.map((k) => `<@${k}>`)
-											.join(", ") + "..."
+											.join(", ") +
+									  `, și alți ${participantIds.length - 44}`
 									: participantIds
 											.map((k) => `<@${k}>`)
 											.join(", ")
