@@ -54,7 +54,7 @@ export const respondToSubjectAutocomplete = async (
 
 	const response = factKeys
 		.filter((k) =>
-			k.startsWith(interaction.options.getFocused().toLowerCase()),
+			k.includes(interaction.options.getFocused().toLowerCase()),
 		)
 		.map((k) => ({ name: k, value: k }))
 		.slice(0, 25);
