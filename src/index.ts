@@ -88,6 +88,10 @@ const generateBetMessage = (
 			.setEmoji("✅"),
 	);
 
+	const participantIds = Object.keys(info.participants);
+	const participantsExtra =
+		participantIds.length >= 10 ? ` ${participantIds.length}` : "";
+
 	return {
 		content: info.pingRoleId ? `<@&${info.pingRoleId}>` : undefined,
 		embeds: [
@@ -110,7 +114,7 @@ const generateBetMessage = (
 						? {
 								name: "Rezultat",
 								value:
-									Object.keys(info.participants).length > 0
+									participantIds.length > 0
 										? `**${
 												// @ts-ignore
 												TEAM_EMOJI[info.winningTeam]
@@ -129,10 +133,10 @@ const generateBetMessage = (
 								).toSeconds()}:R>`,
 						  },
 					{
-						name: "Participanți",
+						name: "Participanți" + participantsExtra,
 						value:
-							Object.keys(info.participants).length > 0
-								? Object.keys(info.participants)
+							participantIds.length > 0
+								? participantIds
 										.map((k) => `<@${k}>`)
 										.join(", ")
 								: "*nimeni*",
