@@ -26,8 +26,8 @@ client.once(Events.ClientReady, async (c) => {
 	console.log(`Logged in as ${c.user.tag}`);
 
 	c.user.setActivity({
-		name: "pariuri",
-		type: ActivityType.Playing,
+		name: "Jackpoturi toată ziua!",
+		type: ActivityType.Custom,
 	});
 
 	await refreshAllBetTimeouts(client);
