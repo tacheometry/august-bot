@@ -91,6 +91,14 @@ export const handleInfoCommand = async (
 			const body = interaction.options.getString("info", true);
 			let factInfo = guildFacts[subject];
 
+			if (body.length > 1900 || subject.length > 100) {
+				interaction.reply({
+					ephemeral: true,
+					content: "Textul este prea lung.",
+				});
+				return;
+			}
+
 			if (
 				factInfo &&
 				interaction.user.id !== factInfo.authorId &&
