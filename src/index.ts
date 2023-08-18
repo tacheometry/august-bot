@@ -71,6 +71,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.on(Events.MessageCreate, async (message) => {
+	if (!message.guild) return;
 	await handleMessageCreation(message);
 });
 
