@@ -90,7 +90,7 @@ const generateBetMessage = (
 
 	const participantIds = Object.keys(info.participants);
 	const participantsExtra =
-		participantIds.length >= 10 ? ` ${participantIds.length}` : "";
+		participantIds.length >= 10 ? ` (${participantIds.length})` : "";
 
 	return {
 		content: info.pingRoleId ? `<@&${info.pingRoleId}>` : undefined,
