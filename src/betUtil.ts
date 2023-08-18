@@ -129,12 +129,12 @@ const generateBetMessage = (
 						name: "Participanți" + participantsExtra,
 						value:
 							participantIds.length > 0
-								? participantIds.length > 44
+								? participantIds.length > 43
 									? participantIds
-											.slice(0, 44)
+											.slice(0, 43)
 											.map((k) => `<@${k}>`)
 											.join(", ") +
-									  `, și alți ${participantIds.length - 44}`
+									  `, și alți ${participantIds.length - 43}`
 									: participantIds
 											.map((k) => `<@${k}>`)
 											.join(", ")
