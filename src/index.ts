@@ -259,14 +259,24 @@ const endBet = async (betInfo: BetInfo) => {
 	const timeoutShouldEndAt = DateTime.fromISO(betInfo.resultTime)
 		.plus({ hours: betInfo.muteHours })
 		.toMillis();
-	for await (const loser of losers.map((id) =>
+
+	for (const loserPromise of losers.map((id) =>
 		channel.guild.members.fetch({
 			user: id,
 		}),
 	)) {
-		await loser
-			.timeout(timeoutShouldEndAt - Date.now(), "A pierdut un pariu.")
-			.catch(() => console.log(`Couldn't time out ${loser.displayName}`));
+		await loserPromise
+			.then((l) =>
+				l
+					.timeout(
+						timeoutShouldEndAt - Date.now(),
+						"A pierdut un pariu.",
+					)
+					.catch(() =>
+						console.log(`Couldn't time out ${l.displayName}`),
+					),
+			)
+			.catch(() => console.log("Couldn't fetch member"));
 	}
 };
 
