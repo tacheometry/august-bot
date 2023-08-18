@@ -129,9 +129,14 @@ const generateBetMessage = (
 						name: "Participanți" + participantsExtra,
 						value:
 							participantIds.length > 0
-								? participantIds
-										.map((k) => `<@${k}>`)
-										.join(", ")
+								? participantIds.length > 44
+									? participantIds
+											.slice(0, 44)
+											.map((k) => `<@${k}>`)
+											.join(", ") + "..."
+									: participantIds
+											.map((k) => `<@${k}>`)
+											.join(", ")
 								: "*nimeni*",
 					},
 				)
