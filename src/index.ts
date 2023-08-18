@@ -5,11 +5,21 @@ import {
 	handleButtonInteraction,
 	handleCreateBetCommand,
 } from "./betUtil";
-import { handleInfoCommand, respondToSubjectAutocomplete } from "./factUtil";
+import {
+	handleAutoReplyCommand,
+	handleInfoCommand,
+	handleMessageCreation,
+	respondToSubjectAutocomplete,
+} from "./factUtil";
 dotenv.config();
 
 const client = new Client({
-	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildMembers,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.MessageContent,
+	],
 });
 
 client.once(Events.ClientReady, async (c) => {
@@ -29,12 +39,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
 	switch (interaction.commandName) {
 		case "pariu": {
 			handleCreateBetCommand(interaction);
-
 			break;
 		}
 		case "info": {
 			handleInfoCommand(interaction);
-
+			break;
+		}
+		case "auto-reply": {
+			handleAutoReplyCommand(interaction);
 			break;
 		}
 	}
@@ -49,9 +61,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.on(Events.InteractionCreate, async (interaction) => {
 	if (!interaction.isAutocomplete()) return;
-	if (interaction.commandName !== "info") return;
+	if (
+		interaction.commandName !== "info" &&
+		interaction.commandName !== "auto-reply"
+	)
+		return;
 
 	await respondToSubjectAutocomplete(interaction);
+});
+
+client.on(Events.MessageCreate, async (message) => {
+	await handleMessageCreation(message);
 });
 
 client.login(process.env.DISCORD_TOKEN);

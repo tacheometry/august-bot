@@ -2,6 +2,7 @@ import {
 	AutocompleteInteraction,
 	ChatInputCommandInteraction,
 	InteractionReplyOptions,
+	Message,
 } from "discord.js";
 import { DateTime } from "luxon";
 import Keyv from "keyv";
@@ -12,13 +13,15 @@ export const factDb = new Keyv(process.env.DB_URL, {
 	namespace: "facts",
 });
 factDb.on("error", (err) => console.log("DB error:", err));
-export const factSubjectCache = new Map<string, string[]>();
+export const factSubjectsCache = new Map<string, string[]>();
+export const factContentCache = new Map<string, Map<string, string>>();
 
 export interface FactInfo {
 	authorId: string;
 	subject: string;
 	body: string;
 	editedAt: string;
+	autoReply?: true;
 }
 
 export const generateFactMessage = (
@@ -40,16 +43,27 @@ export const getGuildFacts = async (
 	return (await factDb.get(guildId)) ?? {};
 };
 
+const refreshFactContentCache = async (
+	guildId: string,
+	facts: Record<string, FactInfo | undefined>,
+) => {
+	const cacheValue = new Map<string, string>();
+	Object.entries(facts).forEach(([k, v]) => {
+		if (v && v.autoReply) cacheValue.set(k, v.body);
+	});
+	return cacheValue;
+};
+
 export const respondToSubjectAutocomplete = async (
 	interaction: AutocompleteInteraction,
 ) => {
 	const guildId = interaction.guildId!;
 
-	let factKeys = factSubjectCache.get(guildId);
+	let factKeys = factSubjectsCache.get(guildId);
 	if (!factKeys) {
 		const guildFactData = (await factDb.get(guildId)) ?? {};
 		factKeys = Object.keys(guildFactData);
-		factSubjectCache.set(guildId, factKeys);
+		factSubjectsCache.set(guildId, factKeys);
 	}
 
 	const response = factKeys
@@ -135,7 +149,7 @@ export const handleInfoCommand = async (
 						parse: [],
 					},
 				});
-				factSubjectCache.set(
+				factSubjectsCache.set(
 					interaction.guildId!,
 					Object.keys(guildFacts),
 				);
@@ -153,10 +167,63 @@ export const handleInfoCommand = async (
 			console.log(
 				`Fact "${subject}" edited by ${interaction.user.id}: "${body}"`,
 			);
-			factSubjectCache.set(interaction.guildId!, Object.keys(guildFacts));
+			factSubjectsCache.set(
+				interaction.guildId!,
+				Object.keys(guildFacts),
+			);
 			await interaction.reply(generateFactMessage(factInfo));
 
 			break;
 		}
 	}
+};
+
+export const handleAutoReplyCommand = async (
+	interaction: ChatInputCommandInteraction,
+) => {
+	const subject = interaction.options
+		.getString("subiect", true)
+		.toLowerCase();
+	const enabled = interaction.options.getBoolean("on", true);
+
+	const allFacts = await getGuildFacts(interaction.guildId!);
+	const fact = allFacts[subject];
+
+	if (!fact) {
+		await interaction.reply({
+			ephemeral: true,
+			content: "Nu am putut găsi acest subiect.",
+		});
+		return;
+	}
+
+	if (enabled) fact.autoReply = true;
+	else delete fact.autoReply;
+
+	await factDb.set(interaction.guildId!, allFacts);
+	await interaction.reply(
+		`Auto-reply ${
+			enabled ? "pornit" : "oprit"
+		} pentru **${fact.subject.toUpperCase()}**.`,
+	);
+	await refreshFactContentCache(interaction.guildId!, allFacts);
+};
+
+export const handleMessageCreation = async (message: Message) => {
+	const contentMapping =
+		factContentCache.get(message.guildId!) ??
+		(await refreshFactContentCache(
+			message.guildId!,
+			await getGuildFacts(message.guildId!),
+		));
+
+	const body = contentMapping.get(message.content.toLowerCase());
+	if (body)
+		message.reply({
+			allowedMentions: {
+				parse: [],
+				repliedUser: false,
+			},
+			content: body,
+		});
 };

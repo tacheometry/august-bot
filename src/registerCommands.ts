@@ -57,6 +57,25 @@ const COMMAND_DEFINITIONS = [
 						.setMaxLength(1900),
 				),
 		),
+	new SlashCommandBuilder()
+		.setName("auto-reply")
+		.setDescription(
+			"Activează/dezactivează auto-reply pentru un anumit subiect.",
+		)
+		.setDMPermission(false)
+		.setDefaultMemberPermissions(0)
+		.addStringOption((o) =>
+			o
+				.setName("subiect")
+				.setDescription(
+					"Subiectul pentru care activezi/dezactivezi auto-reply.",
+				)
+				.setRequired(true)
+				.setAutocomplete(true),
+		)
+		.addBooleanOption((o) =>
+			o.setName("on").setDescription("Pornit/oprit").setRequired(true),
+		),
 ];
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN as string);
