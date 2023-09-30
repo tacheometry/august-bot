@@ -318,7 +318,7 @@ export const refreshAllBetTimeouts = async (client: Client) => {
 	}
 };
 
-export const handleButtonInteraction = async (
+export const handleBetButtonInteraction = async (
 	interaction: ButtonInteraction,
 ) => {
 	const [idFirst, idMiddle, idLast] = interaction.customId.split("|");

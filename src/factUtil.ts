@@ -1,12 +1,19 @@
 import {
+	ActionRowBuilder,
 	AutocompleteInteraction,
+	ButtonBuilder,
+	ButtonInteraction,
+	ButtonStyle,
 	ChatInputCommandInteraction,
+	EmbedBuilder,
 	InteractionReplyOptions,
+	InteractionUpdateOptions,
 	Message,
 } from "discord.js";
 import { DateTime } from "luxon";
 import Keyv from "keyv";
 import * as dotenv from "dotenv";
+import latinize from "latinize";
 dotenv.config();
 
 export const factDb = new Keyv(process.env.DB_URL, {
@@ -24,6 +31,8 @@ export interface FactInfo {
 	autoReply?: true;
 }
 
+export type GuildFacts = Record<string, FactInfo | undefined>;
+
 export const generateFactMessage = (
 	info: FactInfo,
 ): InteractionReplyOptions => {
@@ -37,21 +46,32 @@ export const generateFactMessage = (
 	};
 };
 
-export const getGuildFacts = async (
-	guildId: string,
-): Promise<Record<string, FactInfo | undefined>> => {
+export const getGuildFacts = async (guildId: string): Promise<GuildFacts> => {
 	return (await factDb.get(guildId)) ?? {};
 };
 
-const refreshFactContentCache = async (
-	guildId: string,
-	facts: Record<string, FactInfo | undefined>,
-) => {
+const generateContentCache = (facts: GuildFacts) => {
 	const cacheValue = new Map<string, string>();
 	Object.entries(facts).forEach(([k, v]) => {
 		if (v && v.autoReply) cacheValue.set(k, v.body);
 	});
 	return cacheValue;
+};
+
+const updateContentCache = async (guildId: string) => {
+	const facts = await getGuildFacts(guildId!);
+	const cache = generateContentCache(facts);
+	factContentCache.set(guildId, cache);
+	console.log("Cache updated");
+	return cache;
+};
+
+const getContentCache = async (guildId: string) => {
+	return factContentCache.get(guildId) ?? (await updateContentCache(guildId));
+};
+
+const serializeSubject = (subject: string) => {
+	return latinize(subject).toLowerCase();
 };
 
 export const respondToSubjectAutocomplete = async (
@@ -68,7 +88,7 @@ export const respondToSubjectAutocomplete = async (
 
 	const response = factKeys
 		.filter((k) =>
-			k.includes(interaction.options.getFocused().toLowerCase()),
+			k.includes(serializeSubject(interaction.options.getFocused())),
 		)
 		.map((k) => ({ name: k, value: k }))
 		.slice(0, 25);
@@ -102,9 +122,9 @@ export const handleInfoCommand = async (
 			break;
 		}
 		case "edit": {
-			const subject = interaction.options
-				.getString("subiect", true)
-				.toLowerCase();
+			const subject = serializeSubject(
+				interaction.options.getString("subiect", true),
+			);
 			const body = interaction.options.getString("info", true);
 			let factInfo = guildFacts[subject];
 
@@ -175,15 +195,28 @@ export const handleInfoCommand = async (
 
 			break;
 		}
+		case "list": {
+			const pageNumber =
+				(interaction.options.getInteger("pagina", false) ?? 1) - 1;
+			const autoReplyOnly =
+				interaction.options.getBoolean("auto-reply", false) ?? false;
+			interaction.reply(
+				generateFactListMessage(
+					await getGuildFacts(interaction.guildId!),
+					pageNumber,
+					autoReplyOnly,
+				),
+			);
+		}
 	}
 };
 
 export const handleAutoReplyCommand = async (
 	interaction: ChatInputCommandInteraction,
 ) => {
-	const subject = interaction.options
-		.getString("subiect", true)
-		.toLowerCase();
+	const subject = serializeSubject(
+		interaction.options.getString("subiect", true),
+	);
 	const enabled = interaction.options.getBoolean("on", true);
 
 	const allFacts = await getGuildFacts(interaction.guildId!);
@@ -206,18 +239,89 @@ export const handleAutoReplyCommand = async (
 			enabled ? "pornit" : "oprit"
 		} pentru **${fact.subject.toUpperCase()}**.`,
 	);
-	await refreshFactContentCache(interaction.guildId!, allFacts);
+	await generateContentCache(allFacts);
+};
+
+const FACT_LIST_PAGE_SIZE = 15;
+const generateFactListMessage = (
+	facts: GuildFacts,
+	pageNumber: number,
+	autoReplyOnly: boolean,
+): InteractionReplyOptions & InteractionUpdateOptions => {
+	let factList = Object.values(facts).filter(
+		(f) => f !== undefined,
+	) as FactInfo[];
+	if (autoReplyOnly) factList = factList.filter((f) => f.autoReply);
+
+	const maxPageNumber = Math.ceil(factList.length / FACT_LIST_PAGE_SIZE) - 1;
+	pageNumber = Math.min(pageNumber, maxPageNumber);
+	pageNumber = Math.max(pageNumber, 0);
+	const pageContent = factList.slice(
+		pageNumber * FACT_LIST_PAGE_SIZE,
+		(pageNumber + 1) * FACT_LIST_PAGE_SIZE,
+	);
+
+	const navigationRow = new ActionRowBuilder().addComponents(
+		new ButtonBuilder()
+			.setEmoji("⬅")
+			.setStyle(ButtonStyle.Secondary)
+			.setDisabled(pageNumber === 0)
+			.setCustomId(
+				`info-list-navigation|${pageNumber - 1}|${autoReplyOnly}`,
+			),
+		new ButtonBuilder()
+			.setEmoji("➡")
+			.setStyle(ButtonStyle.Secondary)
+			.setDisabled(pageNumber === maxPageNumber)
+			.setCustomId(
+				`info-list-navigation|${pageNumber + 1}|${autoReplyOnly}`,
+			),
+	);
+
+	const embed = new EmbedBuilder()
+		.setTitle(`Pagina ${pageNumber + 1}/${maxPageNumber + 1}`)
+		.setColor("Gold")
+		.setDescription(
+			pageContent
+				.map(
+					(f, i) =>
+						`${i + 1 + pageNumber * FACT_LIST_PAGE_SIZE}. **${
+							f.subject
+						}** ${f.autoReply ? "`(R)`" : ""}`,
+				)
+				.join("\n"),
+		);
+	const hasAutoReply = pageContent.find((f) => f.autoReply) !== undefined;
+	if (hasAutoReply) embed.setFooter({ text: "(R): Auto-reply pornit" });
+
+	return {
+		content: `Mai multe informații despre un subiect: </info despre:${process.env.INFO_COMMAND_ID}>.`,
+		embeds: [embed],
+		// @ts-ignore
+		components: maxPageNumber !== 0 ? [navigationRow] : [],
+	};
+};
+
+export const handleInfoListButtonInteraction = async (
+	interaction: ButtonInteraction,
+) => {
+	const [idFirst, idMiddle, idLast] = interaction.customId.split("|");
+	const pageNumber = parseInt(idMiddle);
+	const autoReplyOnly = idLast === "true";
+
+	interaction.update(
+		generateFactListMessage(
+			await getGuildFacts(interaction.guildId!),
+			pageNumber,
+			autoReplyOnly,
+		),
+	);
 };
 
 export const handleMessageCreation = async (message: Message) => {
-	const contentMapping =
-		factContentCache.get(message.guildId!) ??
-		(await refreshFactContentCache(
-			message.guildId!,
-			await getGuildFacts(message.guildId!),
-		));
-
-	const body = contentMapping.get(message.content.toLowerCase());
+	if (!factContentCache.has(message.guildId!)) console.log("No cache");
+	const contentMapping = await getContentCache(message.guildId!);
+	const body = contentMapping.get(serializeSubject(message.content));
 	if (body)
 		message.reply({
 			allowedMentions: {

@@ -1,28 +1,30 @@
 {
-  "name": "august",
-  "version": "1.0.0",
-  "description": "",
-  "main": "out/index.js",
-  "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
-    "start": "node .",
-    "register": "node out/registerCommands.js"
-  },
-  "author": "tacheometry",
-  "license": "MIT",
-  "dependencies": {
-    "@keyv/sqlite": "^3.6.5",
-    "discord.js": "^14.13.0",
-    "dotenv": "^16.3.1",
-    "keyv": "^4.5.3",
-    "luxon": "^3.4.0"
-  },
-  "devDependencies": {
-    "@types/luxon": "^3.3.1",
-    "@types/node": "^18.6.2",
-    "prettier": "^3.0.1",
-    "typescript": "^5.1.6"
-  },
-  "private": true
+	"name": "august",
+	"version": "1.0.0",
+	"description": "",
+	"main": "out/index.js",
+	"scripts": {
+		"build": "tsc",
+		"watch": "tsc -w",
+		"start": "node .",
+		"register": "node out/registerCommands.js"
+	},
+	"author": "tacheometry",
+	"license": "MIT",
+	"dependencies": {
+		"@keyv/sqlite": "^3.6.5",
+		"discord.js": "^14.13.0",
+		"dotenv": "^16.3.1",
+		"keyv": "^4.5.3",
+		"latinize": "^0.5.0",
+		"luxon": "^3.4.0"
+	},
+	"devDependencies": {
+		"@types/latinize": "^0.2.16",
+		"@types/luxon": "^3.3.1",
+		"@types/node": "^18.6.2",
+		"prettier": "^3.0.1",
+		"typescript": "^5.1.6"
+	},
+	"private": true
 }

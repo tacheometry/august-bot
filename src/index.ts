@@ -2,12 +2,13 @@ import * as dotenv from "dotenv";
 import { Client, GatewayIntentBits, Events, ActivityType } from "discord.js";
 import {
 	refreshAllBetTimeouts,
-	handleButtonInteraction,
+	handleBetButtonInteraction,
 	handleCreateBetCommand,
 } from "./betUtil";
 import {
 	handleAutoReplyCommand,
 	handleInfoCommand,
+	handleInfoListButtonInteraction,
 	handleMessageCreation,
 	respondToSubjectAutocomplete,
 } from "./factUtil";
@@ -54,9 +55,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.on(Events.InteractionCreate, async (interaction) => {
 	if (!interaction.isButton()) return;
-	if (!interaction.customId.startsWith("enter-team")) return;
-
-	await handleButtonInteraction(interaction);
+	if (interaction.customId.startsWith("enter-team"))
+		handleBetButtonInteraction(interaction);
+	if (interaction.customId.startsWith("info-list-navigation"))
+		handleInfoListButtonInteraction(interaction);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

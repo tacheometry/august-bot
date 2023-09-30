@@ -56,6 +56,26 @@ const COMMAND_DEFINITIONS = [
 						)
 						.setMaxLength(1900),
 				),
+		)
+		.addSubcommand((c) =>
+			c
+				.setName("list")
+				.setDescription("Vezi toate subiectele.")
+				.addBooleanOption((o) =>
+					o
+						.setName("auto-reply")
+						.setRequired(false)
+						.setDescription(
+							"Dacă trebuie să fie incluse numai subiectele cu auto-reply.",
+						),
+				)
+				.addIntegerOption((o) =>
+					o
+						.setName("pagina")
+						.setRequired(false)
+						.setDescription("Numărul paginii din listă.")
+						.setMinValue(1),
+				),
 		),
 	new SlashCommandBuilder()
 		.setName("auto-reply")
