@@ -240,7 +240,6 @@ export const handleAutoReplyCommand = async (
 			enabled ? "pornit" : "oprit"
 		} pentru **${fact.subject.toUpperCase()}**.`,
 	);
-	await generateContentCache(allFacts);
 	await updateContentCache(interaction.guildId!);
 };
 
