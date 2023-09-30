@@ -13,6 +13,7 @@ import {
 import { DateTime } from "luxon";
 import Keyv from "keyv";
 import * as dotenv from "dotenv";
+dotenv.config();
 
 export const factDb = new Keyv(process.env.DB_URL, {
 	namespace: "facts",
@@ -60,7 +61,7 @@ const updateContentCache = async (guildId: string) => {
 	const facts = await getGuildFacts(guildId!);
 	const cache = generateContentCache(facts);
 	factContentCache.set(guildId, cache);
-	console.log("Cache updated");
+	console.log(`Cache for guild ${guildId} updated`);
 	return cache;
 };
 
@@ -171,12 +172,14 @@ export const handleInfoCommand = async (
 					interaction.guildId!,
 					Object.keys(guildFacts),
 				);
+				updateContentCache(interaction.guildId!);
 				return;
 			}
 
 			factInfo = {
 				authorId: interaction.user.id,
 				editedAt: DateTime.now().toISO()!,
+				autoReply: factInfo?.autoReply,
 				subject,
 				body,
 			};
@@ -189,8 +192,8 @@ export const handleInfoCommand = async (
 				interaction.guildId!,
 				Object.keys(guildFacts),
 			);
+			updateContentCache(interaction.guildId!);
 			await interaction.reply(generateFactMessage(factInfo));
-
 			break;
 		}
 		case "list": {
@@ -238,6 +241,7 @@ export const handleAutoReplyCommand = async (
 		} pentru **${fact.subject.toUpperCase()}**.`,
 	);
 	await generateContentCache(allFacts);
+	await updateContentCache(interaction.guildId!);
 };
 
 const FACT_LIST_PAGE_SIZE = 15;
