@@ -13,8 +13,6 @@ import {
 import { DateTime } from "luxon";
 import Keyv from "keyv";
 import * as dotenv from "dotenv";
-import latinize from "latinize";
-dotenv.config();
 
 export const factDb = new Keyv(process.env.DB_URL, {
 	namespace: "facts",
@@ -71,7 +69,7 @@ const getContentCache = async (guildId: string) => {
 };
 
 const serializeSubject = (subject: string) => {
-	return latinize(subject).toLowerCase();
+	return subject.toLowerCase();
 };
 
 export const respondToSubjectAutocomplete = async (
