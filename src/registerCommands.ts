@@ -13,6 +13,12 @@ const COMMAND_DEFINITIONS = [
 				.setDescription("Canalul pariului")
 				.addChannelTypes(ChannelType.GuildText),
 		)
+		.addUserOption((o) =>
+			o
+				.setName("host")
+				.setRequired(false)
+				.setDescription("Gazda pariului"),
+		)
 		.setDefaultMemberPermissions(0)
 		.setDMPermission(false),
 	new SlashCommandBuilder()

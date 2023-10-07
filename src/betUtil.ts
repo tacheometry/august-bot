@@ -368,6 +368,8 @@ export const handleCreateBetCommand = async (
 		"canal",
 		true,
 	) as TextChannel;
+	const betHost =
+		interaction.options.getUser("host", false) ?? interaction.user;
 
 	const betId = `pariu-${interaction.id}`;
 
@@ -474,12 +476,12 @@ export const handleCreateBetCommand = async (
 		rewardText,
 		muteHours: muteDurationHours,
 		resultTime: resultAnnouncementTime.toISO()!,
-		hostName: interaction.user.displayName,
+		hostName: betHost.displayName,
 		hostPicture:
-			interaction.user.avatarURL({
+			betHost.avatarURL({
 				forceStatic: true,
 				size: 128,
-			}) ?? interaction.user.defaultAvatarURL,
+			}) ?? betHost.defaultAvatarURL,
 		participants: {},
 	});
 
