@@ -102,6 +102,25 @@ const COMMAND_DEFINITIONS = [
 		.addBooleanOption((o) =>
 			o.setName("on").setDescription("Pornit/oprit").setRequired(true),
 		),
+	new SlashCommandBuilder()
+		.setName("config")
+		.setDescription("Configurează botul.")
+		.setDMPermission(false)
+		.setDefaultMemberPermissions(0)
+		.addSubcommand((c) =>
+			c
+				.setName("unbelievaboat")
+				.setDescription("Configurează UnbelievaBoat")
+				.addStringOption((o) =>
+					o
+						.setName("currency")
+						.setDescription("Textul pentru monedă.")
+						.setRequired(true),
+				)
+				.addStringOption((o) =>
+					o.setName("token").setDescription("UnblievaBoat token."),
+				),
+		),
 ];
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN as string);

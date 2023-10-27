@@ -19,6 +19,8 @@ import {
 import { DateTime } from "luxon";
 import Keyv from "keyv";
 import * as dotenv from "dotenv";
+import { getUnbGuildConfig } from "./unbUtil";
+import { Client as UnbClient } from "unb-api";
 dotenv.config();
 
 export interface BetInfo {
@@ -26,6 +28,7 @@ export interface BetInfo {
 	titleText: string;
 	descriptionText: string;
 	rewardText: string;
+	currencyReward?: number;
 	resultTime: string;
 	muteHours: number;
 	channelId: string;
@@ -289,6 +292,28 @@ const endBet = async (client: Client, betInfo: BetInfo) => {
 			)
 			.catch(() => console.log("Couldn't fetch member"));
 	}
+
+	if (!betInfo.currencyReward) return;
+	const unbData = await getUnbGuildConfig(channel.guildId);
+	if (!unbData || !unbData.token) return;
+	const unbClient = new UnbClient(unbData.token);
+
+	winners.forEach((winnerId) =>
+		unbClient
+			.editUserBalance(
+				channel.guildId,
+				winnerId,
+				{
+					bank: betInfo.currencyReward,
+				},
+				`${betInfo.betId} | ${betInfo.titleText}`,
+			)
+			.catch((reason) =>
+				console.warn(
+					`Couldn't award user ${winnerId} through UnbelievaBoat: ${reason}`,
+				),
+			),
+	);
 };
 
 const refreshBetTimeout = (client: Client, betId: string, endAt: DateTime) => {
@@ -392,6 +417,7 @@ export const handleCreateBetCommand = async (
 		const rewardDescriptionInput = new TextInputBuilder()
 			.setCustomId("reward")
 			.setLabel("Descriere recompensă")
+			.setPlaceholder("!500 pentru recompensă UnbelievaBoat")
 			.setStyle(TextInputStyle.Paragraph);
 
 		const resultAnnouncementTimeInput = new TextInputBuilder()
@@ -431,7 +457,7 @@ export const handleCreateBetCommand = async (
 	const titleText = modalInteraction.fields.getTextInputValue("title");
 	const descriptionText =
 		modalInteraction.fields.getTextInputValue("description");
-	const rewardText = modalInteraction.fields.getTextInputValue("reward");
+	let rewardText = modalInteraction.fields.getTextInputValue("reward");
 	const resultAnnouncementTimeText =
 		modalInteraction.fields.getTextInputValue("resultTime");
 	const muteDurationText =
@@ -469,11 +495,24 @@ export const handleCreateBetCommand = async (
 		return;
 	}
 
+	let currencyAmount = undefined;
+	if (rewardText.startsWith("!")) {
+		currencyAmount = parseInt(rewardText.substring(1));
+		if (currencyAmount !== currencyAmount) currencyAmount = undefined;
+	}
+	if (currencyAmount) {
+		const unbData = await getUnbGuildConfig(interaction.guildId!);
+		rewardText = `${currencyAmount} ${
+			unbData?.currencyText ?? "bani UnbelievaBoat"
+		}`;
+	}
+
 	const betInfo = await startBet(postChannel, {
 		betId,
 		titleText,
 		descriptionText,
 		rewardText,
+		currencyReward: currencyAmount,
 		muteHours: muteDurationHours,
 		resultTime: resultAnnouncementTime.toISO()!,
 		hostName: betHost.displayName,

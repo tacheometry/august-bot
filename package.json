@@ -16,7 +16,8 @@
 		"discord.js": "^14.13.0",
 		"dotenv": "^16.3.1",
 		"keyv": "^4.5.3",
-		"luxon": "^3.4.0"
+		"luxon": "^3.4.0",
+		"unb-api": "github:tacheometry/unb-api"
 	},
 	"devDependencies": {
 		"@types/luxon": "^3.3.1",

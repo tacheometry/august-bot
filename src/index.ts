@@ -12,6 +12,7 @@ import {
 	handleMessageCreation,
 	respondToSubjectAutocomplete,
 } from "./factUtil";
+import { handleUnbConfigCommand } from "./unbUtil";
 dotenv.config();
 
 const client = new Client({
@@ -48,6 +49,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 		}
 		case "auto-reply": {
 			handleAutoReplyCommand(interaction);
+			break;
+		}
+		case "config": {
+			if (interaction.options.getSubcommand() === "unbelievaboat")
+				handleUnbConfigCommand(interaction);
 			break;
 		}
 	}
