@@ -40,6 +40,19 @@ export interface BetInfo {
 	winningTeam?: string;
 }
 
+export interface GuildBetSchedule {
+	postAtHour: number;
+	resultHour: number;
+	betInfo: Omit<
+		BetInfo,
+		"betId" | "resultTime" | "messageId" | "participants"
+	>;
+}
+export interface GuildBetConfigInfo {
+	pingRoleId?: string;
+	schedule?: GuildBetSchedule;
+}
+
 export enum TEAM_NAME {
 	TEAM_1 = "TEAM_1",
 	TEAM_2 = "TEAM_2",
@@ -57,6 +70,10 @@ export const betDb = new Keyv(process.env.DB_URL, {
 	namespace: "bets",
 });
 betDb.on("error", (err) => console.log("DB error:", err));
+export const betConfigDb = new Keyv(process.env.DB_URL, {
+	namespace: "bet_config",
+});
+betConfigDb.on("error", (err) => console.log("DB error:", err));
 const timeoutsForBets = new Map<string, NodeJS.Timeout>();
 
 const generateBetMessage = (
@@ -90,6 +107,9 @@ const generateBetMessage = (
 
 	return {
 		content: info.pingRoleId ? `<@&${info.pingRoleId}>` : undefined,
+		allowedMentions: {
+			roles: info.pingRoleId ? [info.pingRoleId] : [],
+		},
 		embeds: [
 			new EmbedBuilder()
 				.setTitle(info.titleText)
@@ -507,6 +527,10 @@ export const handleCreateBetCommand = async (
 		}`;
 	}
 
+	const configData = (await betConfigDb.get(interaction.guildId!)) as
+		| GuildBetConfigInfo
+		| undefined;
+
 	const betInfo = await startBet(postChannel, {
 		betId,
 		titleText,
@@ -522,9 +546,32 @@ export const handleCreateBetCommand = async (
 				size: 128,
 			}) ?? betHost.defaultAvatarURL,
 		participants: {},
+		pingRoleId: configData?.pingRoleId,
 	});
 
 	await modalInteraction.editReply({
 		content: `Pariu creat: https://discord.com/channels/${interaction.guildId}/${betInfo.channelId}/${betInfo.messageId}`,
+	});
+};
+
+export const handleConfigPingRoleCommand = async (
+	interaction: ChatInputCommandInteraction<CacheType>,
+) => {
+	const role = interaction.options.getRole("role", true);
+	let newConfig = (await betConfigDb.get(interaction.guildId!)) as
+		| GuildBetConfigInfo
+		| undefined;
+	newConfig ??= {};
+	newConfig.pingRoleId = role.id;
+
+	await betConfigDb.set(interaction.guildId!, newConfig);
+
+	interaction.reply({
+		content: `<@&${role.id}> va fi notificat la pariuri.`,
+		options: {
+			allowedMentions: {
+				parse: [],
+			},
+		},
 	});
 };

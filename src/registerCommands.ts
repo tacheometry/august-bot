@@ -120,6 +120,19 @@ const COMMAND_DEFINITIONS = [
 				.addStringOption((o) =>
 					o.setName("token").setDescription("UnblievaBoat token."),
 				),
+		)
+		.addSubcommand((c) =>
+			c
+				.setName("ping-role")
+				.setDescription(
+					"Configurează rolul care va fi menționat la pariuri",
+				)
+				.addRoleOption((o) =>
+					o
+						.setName("role")
+						.setDescription("Rolul respectiv")
+						.setRequired(true),
+				),
 		),
 ];
 

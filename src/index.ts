@@ -4,6 +4,7 @@ import {
 	refreshAllBetTimeouts,
 	handleBetButtonInteraction,
 	handleCreateBetCommand,
+	handleConfigPingRoleCommand,
 } from "./betUtil";
 import {
 	handleAutoReplyCommand,
@@ -54,6 +55,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 		case "config": {
 			if (interaction.options.getSubcommand() === "unbelievaboat")
 				handleUnbConfigCommand(interaction);
+			if (interaction.options.getSubcommand() === "ping-role")
+				handleConfigPingRoleCommand(interaction);
 			break;
 		}
 	}
