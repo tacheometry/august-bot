@@ -20,6 +20,7 @@ import { DateTime } from "luxon";
 import Keyv from "keyv";
 import * as dotenv from "dotenv";
 import { getUnbGuildConfig } from "./unbUtil";
+import { getISOInFuture } from "./dateUtil";
 import { Client as UnbClient } from "unb-api";
 dotenv.config();
 
@@ -502,13 +503,7 @@ export const handleCreateBetCommand = async (
 	const muteDurationHours =
 		Math.floor(parseFloat(muteDurationText) * 10) / 10;
 
-	const resultAnnouncementTime = DateTime.fromISO(
-		resultAnnouncementTimeText,
-		{
-			locale: "ro-RO",
-			zone: "Europe/Bucharest",
-		},
-	);
+	const resultAnnouncementTime = getISOInFuture(resultAnnouncementTimeText);
 
 	if (resultAnnouncementTime.invalidReason) {
 		modalInteraction.editReply({
@@ -599,10 +594,7 @@ const refreshBetSchedule = async (client: Client, guildId: string) => {
 	if (!guildConfigInfo || !guildConfigInfo.schedule) return;
 	const schedule = guildConfigInfo.schedule;
 
-	const nextTime = DateTime.fromISO(schedule.postAtHour, {
-		locale: "ro-RO",
-		zone: "Europe/Bucharest",
-	});
+	const nextTime = getISOInFuture(schedule.postAtHour);
 	const timeout = setTimeout(async () => {
 		const channel = (await client.channels.fetch(
 			schedule.betInfo.channelId,
