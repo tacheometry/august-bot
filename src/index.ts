@@ -4,7 +4,9 @@ import {
 	refreshAllBetTimeouts,
 	handleBetButtonInteraction,
 	handleCreateBetCommand,
-	handleConfigPingRoleCommand,
+	handlePingRoleConfigCommand,
+	handleScheduleConfigCommand,
+	handleScheduleDeleteCommand,
 } from "./betUtil";
 import {
 	handleAutoReplyCommand,
@@ -56,7 +58,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 			if (interaction.options.getSubcommand() === "unbelievaboat")
 				handleUnbConfigCommand(interaction);
 			if (interaction.options.getSubcommand() === "ping-role")
-				handleConfigPingRoleCommand(interaction);
+				handlePingRoleConfigCommand(interaction);
+			if (interaction.options.getSubcommand() === "schedule")
+				handleScheduleConfigCommand(interaction);
+			if (interaction.options.getSubcommand() === "schedule-delete")
+				handleScheduleDeleteCommand(interaction);
 			break;
 		}
 	}

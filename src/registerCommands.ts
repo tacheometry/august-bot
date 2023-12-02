@@ -133,6 +133,50 @@ const COMMAND_DEFINITIONS = [
 						.setDescription("Rolul respectiv")
 						.setRequired(true),
 				),
+		)
+		.addSubcommand((c) =>
+			c
+				.setName("schedule")
+				.setDescription("Programează un pariu zilnic")
+				.addStringOption((o) =>
+					o
+						.setName("post-time")
+						.setDescription("Ora la care se postează pariul")
+						.setMaxLength(5)
+						.setRequired(true),
+				)
+				.addStringOption((o) =>
+					o
+						.setName("result-time")
+						.setDescription("Ora la care se încheie pariul")
+						.setMaxLength(5)
+						.setRequired(true),
+				)
+				.addChannelOption((o) =>
+					o
+						.setName("channel")
+						.setRequired(true)
+						.setDescription("Canalul pariului")
+						.addChannelTypes(ChannelType.GuildText),
+				)
+				.addStringOption((o) =>
+					o
+						.setName("reward")
+						.setDescription("Recompensa pariului")
+						.setRequired(true),
+				)
+				.addNumberOption((o) =>
+					o
+						.setName("timeout-hours")
+						.setDescription("Timeout pentru pierzători")
+						.setMinValue(0)
+						.setRequired(true),
+				),
+		)
+		.addSubcommand((c) =>
+			c
+				.setName("schedule-delete")
+				.setDescription("Oprește pariul automat zilnic"),
 		),
 ];
 

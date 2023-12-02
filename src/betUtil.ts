@@ -35,17 +35,22 @@ export interface BetInfo {
 	messageId: string;
 	participants: Record<string, string>;
 	hostName: string;
-	hostPicture: string;
+	hostPicture?: string;
 	pingRoleId?: string;
 	winningTeam?: string;
 }
 
 export interface GuildBetSchedule {
-	postAtHour: number;
-	resultHour: number;
+	postAtHour: string;
+	resultHour: string;
 	betInfo: Omit<
 		BetInfo,
-		"betId" | "resultTime" | "messageId" | "participants"
+		| "betId"
+		| "resultTime"
+		| "messageId"
+		| "participants"
+		| "titleText"
+		| "descriptionText"
 	>;
 }
 export interface GuildBetConfigInfo {
@@ -75,6 +80,7 @@ export const betConfigDb = new Keyv(process.env.DB_URL, {
 });
 betConfigDb.on("error", (err) => console.log("DB error:", err));
 const timeoutsForBets = new Map<string, NodeJS.Timeout>();
+const timeoutsForBetSchedules = new Map<string, NodeJS.Timeout>();
 
 const generateBetMessage = (
 	info: Omit<BetInfo, "messageId" | "channelId">,
@@ -554,7 +560,7 @@ export const handleCreateBetCommand = async (
 	});
 };
 
-export const handleConfigPingRoleCommand = async (
+export const handlePingRoleConfigCommand = async (
 	interaction: ChatInputCommandInteraction<CacheType>,
 ) => {
 	const role = interaction.options.getRole("role", true);
@@ -573,5 +579,126 @@ export const handleConfigPingRoleCommand = async (
 				parse: [],
 			},
 		},
+	});
+};
+
+const refreshBetSchedule = async (client: Client, guildId: string) => {
+	const guildConfigInfo = (await betConfigDb.get(guildId)) as
+		| GuildBetConfigInfo
+		| undefined;
+	if (timeoutsForBetSchedules.has(guildId)) {
+		clearInterval(timeoutsForBetSchedules.get(guildId));
+		timeoutsForBetSchedules.delete(guildId);
+	}
+	if (!guildConfigInfo || !guildConfigInfo.schedule) return;
+	const schedule = guildConfigInfo.schedule;
+
+	const nextTime = DateTime.fromISO(schedule.postAtHour, {
+		locale: "ro-RO",
+		zone: "Europe/Bucharest",
+	});
+	const timeout = setTimeout(async () => {
+		const channel = (await client.channels.fetch(
+			schedule.betInfo.channelId,
+		)) as TextChannel | null;
+		if (!channel) return;
+		const resultTime = DateTime.fromISO(schedule.resultHour);
+		await startBet(channel, {
+			...schedule.betInfo,
+			betId: `pariu-${nextTime.toMillis()}`,
+			titleText: `Pariul ${nextTime.toLocaleString({
+				dateStyle: "short",
+				timeZone: "Europe/Bucharest",
+			})}`,
+			descriptionText: "",
+			resultTime: resultTime.toISO()!,
+			participants: {},
+		});
+		console.log(`Started scheduled bet in ${guildId}`);
+		refreshBetSchedule(client, guildId);
+	}, nextTime.diffNow().toMillis());
+	timeoutsForBetSchedules.set(guildId, timeout);
+	console.log(`Bet in ${guildId} scheduled for ${nextTime.toISOTime()}`);
+};
+
+export const handleScheduleConfigCommand = async (
+	interaction: ChatInputCommandInteraction<CacheType>,
+) => {
+	const postTime = interaction.options.getString("post-time", true);
+	const resultTime = interaction.options.getString("result-time", true);
+	const channel = interaction.options.getChannel("channel", true);
+	let rewardText = interaction.options.getString("reward", true);
+	const muteHours = interaction.options.getNumber("timeout-hours", true);
+
+	let timesAreInvalid =
+		DateTime.fromISO(postTime).invalidReason ||
+		DateTime.fromISO(resultTime).invalidReason;
+	if (timesAreInvalid) {
+		interaction.reply({
+			ephemeral: true,
+			content: "Timpii nu sunt valizi.",
+		});
+		return;
+	}
+
+	let newConfig = (await betConfigDb.get(interaction.guildId!)) as
+		| GuildBetConfigInfo
+		| undefined;
+	newConfig ??= {};
+
+	let currencyAmount = undefined;
+	if (rewardText.startsWith("!")) {
+		currencyAmount = parseInt(rewardText.substring(1));
+		if (currencyAmount !== currencyAmount) currencyAmount = undefined;
+	}
+	if (currencyAmount) {
+		const unbData = await getUnbGuildConfig(interaction.guildId!);
+		rewardText = `${currencyAmount} ${
+			unbData?.currencyText ?? "bani UnbelievaBoat"
+		}`;
+	}
+
+	newConfig.schedule = {
+		postAtHour: postTime,
+		resultHour: resultTime,
+		betInfo: {
+			channelId: channel.id,
+			hostName: "[Automat]",
+			muteHours: muteHours,
+			rewardText: rewardText,
+			currencyReward: currencyAmount,
+			pingRoleId: newConfig.pingRoleId,
+		},
+	};
+	await betConfigDb.set(interaction.guildId!, newConfig);
+
+	refreshBetSchedule(interaction.client, interaction.guildId!);
+
+	interaction.reply({
+		content: `Pariul zilnic a fost programat. Următorul pariu va fi postat <t:${DateTime.fromISO(
+			postTime,
+			{
+				locale: "ro-RO",
+				zone: "Europe/Bucharest",
+			},
+		).toSeconds()}>.`,
+	});
+};
+
+export const handleScheduleDeleteCommand = async (
+	interaction: ChatInputCommandInteraction<CacheType>,
+) => {
+	let newConfig = (await betConfigDb.get(interaction.guildId!)) as
+		| GuildBetConfigInfo
+		| undefined;
+	newConfig ??= {};
+	delete newConfig.schedule;
+
+	await betConfigDb.set(interaction.guildId!, newConfig);
+
+	refreshBetSchedule(interaction.client, interaction.guildId!);
+
+	interaction.reply({
+		content: "Pariul zilnic a fost anulat.",
 	});
 };
