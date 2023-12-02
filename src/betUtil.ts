@@ -367,6 +367,12 @@ export const refreshAllBetTimeouts = async (client: Client) => {
 				DateTime.fromISO(betInfo.resultTime),
 			);
 	}
+
+	for await (let [guildId, c] of betConfigDb.iterator()) {
+		const config = c as GuildBetConfigInfo;
+
+		if (config.schedule) refreshBetSchedule(client, guildId);
+	}
 };
 
 export const handleBetButtonInteraction = async (
