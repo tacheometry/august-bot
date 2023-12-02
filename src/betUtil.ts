@@ -600,7 +600,7 @@ const refreshBetSchedule = async (client: Client, guildId: string) => {
 			schedule.betInfo.channelId,
 		)) as TextChannel | null;
 		if (!channel) return;
-		const resultTime = DateTime.fromISO(schedule.resultHour);
+		const resultTime = getISOInFuture(schedule.resultHour);
 		await startBet(channel, {
 			...schedule.betInfo,
 			betId: `pariu-${nextTime.toMillis()}`,
@@ -673,12 +673,8 @@ export const handleScheduleConfigCommand = async (
 	refreshBetSchedule(interaction.client, interaction.guildId!);
 
 	interaction.reply({
-		content: `Pariul zilnic a fost programat. Următorul pariu va fi postat <t:${DateTime.fromISO(
+		content: `Pariul zilnic a fost programat. Următorul pariu va fi postat <t:${getISOInFuture(
 			postTime,
-			{
-				locale: "ro-RO",
-				zone: "Europe/Bucharest",
-			},
 		).toSeconds()}>.`,
 	});
 };
