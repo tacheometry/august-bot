@@ -205,7 +205,9 @@ const editFactWithModal = async (
 		updateContentCache(interaction.guildId!);
 		return;
 	}
-	subject ??= modalInteraction.fields.getTextInputValue("subject");
+	subject ??= serializeSubject(
+		modalInteraction.fields.getTextInputValue("subject"),
+	);
 	if (subject) {
 		const ok = assertFactOwnership(interaction, subject);
 		if (!ok) return;
