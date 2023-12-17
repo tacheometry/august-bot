@@ -10,6 +10,7 @@ import {
 } from "./betUtil";
 import {
 	handleAutoReplyCommand,
+	handleContextMenuCommand,
 	handleInfoCommand,
 	handleInfoListButtonInteraction,
 	handleMessageCreation,
@@ -66,6 +67,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 			break;
 		}
 	}
+});
+
+client.on(Events.InteractionCreate, async (interaction) => {
+	if (!interaction.isMessageContextMenuCommand()) return;
+
+	handleContextMenuCommand(interaction);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

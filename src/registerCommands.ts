@@ -1,5 +1,12 @@
 import * as dotenv from "dotenv";
-import { REST, Routes, SlashCommandBuilder, ChannelType } from "discord.js";
+import {
+	REST,
+	Routes,
+	SlashCommandBuilder,
+	ChannelType,
+	ContextMenuCommandBuilder,
+	ApplicationCommandType,
+} from "discord.js";
 dotenv.config();
 
 const COMMAND_DEFINITIONS = [
@@ -52,15 +59,6 @@ const COMMAND_DEFINITIONS = [
 							"Subiectul despre care vrei să adaugi o informație.",
 						)
 						.setMaxLength(100),
-				)
-				.addStringOption((o) =>
-					o
-						.setName("info")
-						.setRequired(true)
-						.setDescription(
-							"Informația despre subiect. Scrie REMOVE pentru a șterge.",
-						)
-						.setMaxLength(1900),
 				),
 		)
 		.addSubcommand((c) =>
@@ -178,6 +176,9 @@ const COMMAND_DEFINITIONS = [
 				.setName("schedule-delete")
 				.setDescription("Oprește pariul automat zilnic"),
 		),
+	new ContextMenuCommandBuilder()
+		.setName("Adaugă info")
+		.setType(ApplicationCommandType.Message),
 ];
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN as string);

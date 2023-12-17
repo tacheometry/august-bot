@@ -5,10 +5,16 @@ import {
 	ButtonInteraction,
 	ButtonStyle,
 	ChatInputCommandInteraction,
+	ContextMenuCommandInteraction,
 	EmbedBuilder,
 	InteractionReplyOptions,
 	InteractionUpdateOptions,
 	Message,
+	MessageContextMenuCommandInteraction,
+	ModalActionRowComponentBuilder,
+	ModalBuilder,
+	TextInputBuilder,
+	TextInputStyle,
 } from "discord.js";
 import { DateTime } from "luxon";
 import Keyv from "keyv";
@@ -95,6 +101,133 @@ export const respondToSubjectAutocomplete = async (
 	interaction.respond(response);
 };
 
+const assertFactOwnership = async (
+	interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
+	subject: string,
+) => {
+	const guildFacts = await getGuildFacts(interaction.guildId!);
+	let factInfo = guildFacts[subject];
+
+	if (
+		factInfo &&
+		interaction.user.id !== factInfo.authorId &&
+		!interaction.memberPermissions!.has("ManageMessages", true)
+	) {
+		interaction.reply({
+			ephemeral: true,
+			content: "Nu poți edita această informație.",
+		});
+		return false;
+	}
+	return true;
+};
+
+const editFactWithModal = async (
+	interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
+	subject: string | undefined,
+	body: string | undefined,
+) => {
+	const guildFacts = await getGuildFacts(interaction.guildId!);
+
+	if (subject) {
+		const ok = assertFactOwnership(interaction, subject);
+		if (!ok) return;
+	}
+
+	// if (subject.length > 100) {
+	// 	interaction.reply({
+	// 		ephemeral: true,
+	// 		content: "Textul este prea lung.",
+	// 	});
+	// 	return;
+	// }
+
+	const modalId = `info-edit-${interaction.id}`;
+	{
+		const modal = new ModalBuilder()
+			.setCustomId(modalId)
+			.setTitle(subject ? `Editare „${subject}”` : "Editare informație");
+		const subjectInput = new TextInputBuilder()
+			.setCustomId("subject")
+			.setLabel("Subiect")
+			.setStyle(TextInputStyle.Short)
+			.setRequired(true)
+			.setMaxLength(100);
+		const bodyInput = new TextInputBuilder()
+			.setCustomId("body")
+			.setLabel("Conținut")
+			.setStyle(TextInputStyle.Paragraph)
+			.setRequired(true)
+			.setMaxLength(1900);
+		if (body) bodyInput.setValue(body);
+
+		if (!subject)
+			modal.addComponents(
+				new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
+					subjectInput,
+				),
+			);
+		modal.addComponents(
+			new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
+				bodyInput,
+			),
+		);
+		await interaction.showModal(modal);
+	}
+	const modalInteraction = await interaction.awaitModalSubmit({
+		filter: (i) => i.customId === modalId,
+		time: 10 * 60 * 1000,
+	});
+	if (!modalInteraction.isModalSubmit()) return;
+
+	body = modalInteraction.fields.getTextInputValue("body");
+	if (subject && body === "REMOVE") {
+		if (!guildFacts[subject]) {
+			await interaction.reply({
+				ephemeral: true,
+				content: "Nu poți șterge această informație.",
+			});
+			return;
+		}
+
+		const factAuthor = guildFacts[subject]!.authorId;
+		delete guildFacts[subject];
+		await factDb.set(interaction.guildId!, guildFacts);
+		console.log(`Fact "${subject}" deleted by ${interaction.user.id}`);
+		await interaction.reply({
+			ephemeral: true,
+			content: `Informația adăugată de <@${factAuthor}> a fost ștearsă.`,
+			allowedMentions: {
+				parse: [],
+			},
+		});
+		factSubjectsCache.set(interaction.guildId!, Object.keys(guildFacts));
+		updateContentCache(interaction.guildId!);
+		return;
+	}
+	subject ??= modalInteraction.fields.getTextInputValue("subject");
+	if (subject) {
+		const ok = assertFactOwnership(interaction, subject);
+		if (!ok) return;
+	} else return;
+
+	const factInfo = {
+		authorId: interaction.user.id,
+		editedAt: DateTime.now().toISO()!,
+		autoReply: guildFacts[subject]?.autoReply,
+		subject,
+		body,
+	};
+	guildFacts[subject] = factInfo;
+	await factDb.set(interaction.guildId!, guildFacts);
+	console.log(
+		`Fact "${subject}" edited by ${interaction.user.id}: "${body}"`,
+	);
+	factSubjectsCache.set(interaction.guildId!, Object.keys(guildFacts));
+	updateContentCache(interaction.guildId!);
+	await modalInteraction.reply(generateFactMessage(factInfo));
+};
+
 export const handleInfoCommand = async (
 	interaction: ChatInputCommandInteraction,
 ) => {
@@ -124,76 +257,8 @@ export const handleInfoCommand = async (
 			const subject = serializeSubject(
 				interaction.options.getString("subiect", true),
 			);
-			const body = interaction.options.getString("info", true);
-			let factInfo = guildFacts[subject];
-
-			if (body.length > 1900 || subject.length > 100) {
-				interaction.reply({
-					ephemeral: true,
-					content: "Textul este prea lung.",
-				});
-				return;
-			}
-
-			if (
-				factInfo &&
-				interaction.user.id !== factInfo.authorId &&
-				!interaction.memberPermissions!.has("ManageMessages", true)
-			) {
-				interaction.reply({
-					ephemeral: true,
-					content: "Nu poți edita această informație.",
-				});
-				return;
-			}
-
-			if (body === "REMOVE") {
-				if (!factInfo) {
-					await interaction.reply({
-						ephemeral: true,
-						content: "Nu poți șterge această informație.",
-					});
-					return;
-				}
-
-				delete guildFacts[subject];
-				await factDb.set(interaction.guildId!, guildFacts);
-				console.log(
-					`Fact "${subject}" deleted by ${interaction.user.id}`,
-				);
-				await interaction.reply({
-					ephemeral: true,
-					content: `Informația adăugată de <@${factInfo.authorId}> a fost ștearsă.`,
-					allowedMentions: {
-						parse: [],
-					},
-				});
-				factSubjectsCache.set(
-					interaction.guildId!,
-					Object.keys(guildFacts),
-				);
-				updateContentCache(interaction.guildId!);
-				return;
-			}
-
-			factInfo = {
-				authorId: interaction.user.id,
-				editedAt: DateTime.now().toISO()!,
-				autoReply: factInfo?.autoReply,
-				subject,
-				body,
-			};
-			guildFacts[subject] = factInfo;
-			await factDb.set(interaction.guildId!, guildFacts);
-			console.log(
-				`Fact "${subject}" edited by ${interaction.user.id}: "${body}"`,
-			);
-			factSubjectsCache.set(
-				interaction.guildId!,
-				Object.keys(guildFacts),
-			);
-			updateContentCache(interaction.guildId!);
-			await interaction.reply(generateFactMessage(factInfo));
+			const body = guildFacts[subject]?.body;
+			await editFactWithModal(interaction, subject, body);
 			break;
 		}
 		case "list": {
@@ -210,6 +275,16 @@ export const handleInfoCommand = async (
 			);
 		}
 	}
+};
+
+export const handleContextMenuCommand = async (
+	interaction: MessageContextMenuCommandInteraction,
+) => {
+	await editFactWithModal(
+		interaction,
+		undefined,
+		interaction.targetMessage.content,
+	);
 };
 
 export const handleAutoReplyCommand = async (
